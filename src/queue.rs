@@ -53,6 +53,11 @@ impl WfQueue {
     }
 
     #[inline]
+    pub fn capacity(&self) -> usize {
+        self.nptr.len()
+    }
+
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

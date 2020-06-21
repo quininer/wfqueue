@@ -91,6 +91,21 @@ macro_rules! codegen {
                 self.queue.len()
             }
 
+            #[inline]
+            pub fn capacity(&self) -> usize {
+                self.queue.capacity()
+            }
+
+            #[inline]
+            pub fn is_empty(&self) -> bool {
+                self.queue.is_empty()
+            }
+
+            #[inline]
+            pub fn is_full(&self) -> bool {
+                self.queue.is_full()
+            }
+
             pub fn push(&self, input: $item) -> Result<(), $item> {
                 let input: std::num::NonZeroUsize = $into(input);
 
