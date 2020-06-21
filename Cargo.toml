@@ -8,3 +8,10 @@ edition = "2018"
 
 [dependencies]
 loom = { version = "0.3", optional = true }
+cache-padded = "*"
+
+[dev-dependencies]
+crossbeam-queue = "0.2"
+
+[profile.release]
+debug = true

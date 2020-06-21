@@ -4,15 +4,20 @@ mod loom {
 }
 
 use std::num::NonZeroUsize;
-use loom::sync::atomic::{ self, AtomicUsize, Ordering };
+use loom::sync::atomic::{ AtomicUsize, Ordering };
+use cache_padded::CachePadded;
 
 
+#[cfg(not(feature = "loom"))]
 const MAX_TRY: usize = 128;
 
+#[cfg(feature = "loom")]
+const MAX_TRY: usize = 1;
+
 pub struct WfQueue {
-    head: AtomicUsize,
-    tail: AtomicUsize,
-    nptr: Box<[AtomicUsize]>
+    head: CachePadded<AtomicUsize>,
+    tail: CachePadded<AtomicUsize>,
+    nptr: Box<[CachePadded<AtomicUsize>]>
 }
 
 pub struct EnqueueCtx {
@@ -30,14 +35,14 @@ impl WfQueue {
         let mut nptr = Vec::with_capacity(cap);
 
         for _ in 0..cap {
-            nptr.push(AtomicUsize::new(0));
+            nptr.push(CachePadded::new(AtomicUsize::new(0)));
         }
 
         let nptr = nptr.into_boxed_slice();
 
         WfQueue {
-            head: AtomicUsize::new(0),
-            tail: AtomicUsize::new(0),
+            head: CachePadded::new(AtomicUsize::new(0)),
+            tail: CachePadded::new(AtomicUsize::new(0)),
             nptr
         }
     }
@@ -61,7 +66,6 @@ impl WfQueue {
                             return true;
                         }
                     } else {
-                        atomic::fence(Ordering::SeqCst);
                         curr = $ptr.load(Ordering::Acquire);
                     }
                 }
@@ -107,7 +111,6 @@ impl WfQueue {
                             return Some(nzval);
                         },
                         None => {
-                            atomic::fence(Ordering::SeqCst);
                             val = $ptr.load(Ordering::Acquire);
                         }
                     }
@@ -130,7 +133,7 @@ impl WfQueue {
             }
         }
 
-        let tail = self.tail.fetch_add(1, Ordering::Relaxed);
+        let tail = self.tail.fetch_add(1, Ordering::Relaxed) % self.nptr.len();
         let nptr = &self.nptr[tail];
 
         dequeue!{
