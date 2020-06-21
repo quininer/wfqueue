@@ -67,6 +67,7 @@ macro_rules! codegen {
         #[cfg(not(feature = "loom"))]
         paste::item! {
             std::thread_local! {
+                #[allow(non_upper_case_globals)]
                 static [<$name _CTX>]: $crate::Context = $crate::Context::new();
             }
         }
