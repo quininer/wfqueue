@@ -1,5 +1,7 @@
 //! wfqueue implemention
 
+#![deny(unsafe_code)]
+
 use std::cell::Cell;
 use std::num::NonZeroUsize;
 use cache_padded::CachePadded;
@@ -30,6 +32,8 @@ struct Index(Cell<usize>);
 
 impl WfQueue {
     pub fn new(cap: usize) -> WfQueue {
+        assert_ne!(cap, 0, "The capacity is not allowed to be zero");
+
         let mut nptr = Vec::with_capacity(cap);
 
         for _ in 0..cap {
@@ -123,7 +127,7 @@ impl WfQueue {
 
                 for _ in 0..MAX_TRY {
                     match NonZeroUsize::new(val) {
-                        Some(nzval) => if $ptr.compare_exchange_weak(val, 0, Ordering::Release, Ordering::Relaxed).is_ok() {
+                        Some(nzval) => if $ptr.compare_exchange(val, 0, Ordering::Release, Ordering::Relaxed).is_ok() {
                             $ok;
                             return Some(nzval);
                         },
