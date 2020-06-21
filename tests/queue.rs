@@ -31,6 +31,7 @@ fn one_thread() {
         assert_eq!(val, val2);
 
         assert!(queue.try_dequeue(&mut dcx).is_none());
+        assert!(queue.is_empty());
 
         let valx = NonZeroUsize::new(0x42).unwrap();
         let valy = NonZeroUsize::new(0x43).unwrap();
@@ -39,6 +40,7 @@ fn one_thread() {
         assert!(queue.try_enqueue(&mut ecx, valy));
         assert!(queue.try_enqueue(&mut ecx, valz));
         assert!(!queue.try_enqueue(&mut ecx, valz));
+        assert!(queue.is_full());
 
         let valx2 = queue.try_dequeue(&mut dcx).unwrap();
         let valy2 = queue.try_dequeue(&mut dcx).unwrap();

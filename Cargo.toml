@@ -3,16 +3,18 @@ name = "wfqueue"
 version = "0.1.0"
 authors = ["quininer <quininer@live.com>"]
 edition = "2018"
+license = "MIT"
+description = "FAA-based wait-free bounded queue, and 0-unsafe."
+repository = "https://github.com/quininer/wfqueue"
+homepage = "https://github.com/quininer/wfqueue"
+documentation = "https://docs.rs/wfqueue"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 loom = { version = "0.3", optional = true }
-cache-padded = "*"
+cache-padded = "1"
 paste = "0.1"
 
 [dev-dependencies]
 crossbeam-queue = "0.2"
-
-[profile.release]
-debug = true

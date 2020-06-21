@@ -1,3 +1,5 @@
+//! wfqueue implemention
+
 use std::cell::Cell;
 use std::num::NonZeroUsize;
 use cache_padded::CachePadded;
@@ -47,9 +49,21 @@ impl WfQueue {
         let head = self.head.load(Ordering::Relaxed);
         let tail = self.tail.load(Ordering::Relaxed);
 
-        head.checked_sub(tail).unwrap_or(0)
+        head.saturating_sub(tail)
     }
 
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn is_full(&self) -> bool {
+        self.len() == self.nptr.len()
+    }
+
+    /// Each queue should use a fixed enqueue context in each thread.
+    /// If the wrong context is used, it may lead to logic confusion.
     pub fn try_enqueue(&self, ctx: &EnqueueCtx, val: NonZeroUsize) -> bool {
         macro_rules! enqueue {
             ( $ptr:expr, $val:expr ; $ok:expr ; $fail:expr ) => {
@@ -95,6 +109,8 @@ impl WfQueue {
         }
     }
 
+    /// Each queue should use a fixed enqueue context in each thread.
+    /// If the wrong context is used, it may lead to logic confusion.
     pub fn try_dequeue(&self, ctx: &DequeueCtx) -> Option<NonZeroUsize> {
         macro_rules! dequeue {
             ( $ptr:expr ; $ok:expr ; $fail:expr ) => {
