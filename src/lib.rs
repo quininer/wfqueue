@@ -67,16 +67,14 @@ macro_rules! codegen {
         #[cfg(not(feature = "loom"))]
         paste::item! {
             std::thread_local! {
-                static [<$name _ENQ_CTX>]: $crate::queue::EnqueueCtx = $crate::queue::EnqueueCtx::new();
-                static [<$name _DEQ_CTX>]: $crate::queue::DequeueCtx = $crate::queue::DequeueCtx::new();
+                static [<$name _CTX>]: $crate::Context = $crate::Context::new();
             }
         }
 
         #[cfg(feature = "loom")]
         paste::item! {
             loom::thread_local! {
-                static [<$name _ENQ_CTX>]: $crate::queue::EnqueueCtx = $crate::queue::EnqueueCtx::new();
-                static [<$name _DEQ_CTX>]: $crate::queue::DequeueCtx = $crate::queue::DequeueCtx::new();
+                static [<$name _CTX>]: $crate::Context = $crate::Context::new();
             }
         }
 
@@ -96,8 +94,8 @@ macro_rules! codegen {
             pub fn push(&self, input: $item) -> Result<(), $item> {
                 let input: std::num::NonZeroUsize = $into(input);
 
-                if paste::expr!{ &[<$name _ENQ_CTX>] }
-                    .with(|ctx| self.queue.try_enqueue(ctx, input))
+                if paste::expr!{ &[<$name _CTX>] }
+                    .with(|ctx| self.queue.try_enqueue(&ctx.enq, input))
                 {
                     Ok(())
                 } else {
@@ -106,8 +104,8 @@ macro_rules! codegen {
             }
 
             pub fn pop(&self) -> Option<$item> {
-                let output = paste::expr!{ &[<$name _DEQ_CTX>] }
-                    .with(|ctx| self.queue.try_dequeue(ctx))?;
+                let output = paste::expr!{ &[<$name _CTX>] }
+                    .with(|ctx| self.queue.try_dequeue(&ctx.deq))?;
                 Some($from(output))
             }
         }
@@ -116,6 +114,21 @@ macro_rules! codegen {
             fn drop(&mut self) {
                 while self.pop().is_some() {}
             }
+        }
+    }
+}
+
+#[doc(hidden)]
+pub struct Context {
+    pub enq: queue::EnqueueCtx,
+    pub deq: queue::DequeueCtx
+}
+
+impl Context {
+    pub const fn new() -> Context {
+        Context {
+            enq: queue::EnqueueCtx::new(),
+            deq: queue::DequeueCtx::new()
         }
     }
 }
