@@ -1,7 +1,7 @@
 use std::{ env, thread };
 use std::sync::{ atomic, Arc };
 use std::num::NonZeroUsize;
-use wfqueue::{ WfQueue, EnqueueCtx, DequeueCtx };
+use wfqueue::queue::{ WfQueue, EnqueueCtx, DequeueCtx };
 
 const COUNT: isize = 128 * 1024 * 1024;
 

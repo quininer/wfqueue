@@ -3,174 +3,61 @@ mod loom {
     pub use std::sync;
 }
 
-use std::num::NonZeroUsize;
-use loom::sync::atomic::{ AtomicUsize, Ordering };
-use cache_padded::CachePadded;
-
-
-#[cfg(not(feature = "loom"))]
-const MAX_TRY: usize = 128;
-
 #[cfg(feature = "loom")]
-const MAX_TRY: usize = 1;
+use loom;
 
-pub struct WfQueue {
-    head: CachePadded<AtomicUsize>,
-    tail: CachePadded<AtomicUsize>,
-    nptr: Box<[CachePadded<AtomicUsize>]>
-}
+pub mod queue;
 
-pub struct EnqueueCtx {
-    index: Index
-}
+#[macro_export]
+macro_rules! codegen {
+    (
+        pub struct $name:ident ( $item:ty );
 
-pub struct DequeueCtx {
-    index: Index
-}
-
-struct Index(usize);
-
-impl WfQueue {
-    pub fn new(cap: usize) -> WfQueue {
-        let mut nptr = Vec::with_capacity(cap);
-
-        for _ in 0..cap {
-            nptr.push(CachePadded::new(AtomicUsize::new(0)));
+        fn into_nonzero = $into:expr;
+        fn from_nonzero = $from:expr;
+    ) => {
+        pub struct $name {
+            queue: $crate::queue::WfQueue
         }
 
-        let nptr = nptr.into_boxed_slice();
-
-        WfQueue {
-            head: CachePadded::new(AtomicUsize::new(0)),
-            tail: CachePadded::new(AtomicUsize::new(0)),
-            nptr
+        paste::item! {
+            std::thread_local! {
+                static [<$name _ENQ_CTX>]: $crate::queue::EnqueueCtx = $crate::queue::EnqueueCtx::new();
+                static [<$name _DEQ_CTX>]: $crate::queue::DequeueCtx = $crate::queue::DequeueCtx::new();
+            }
         }
-    }
 
-    pub fn len(&self) -> usize {
-        let head = self.head.load(Ordering::Relaxed);
-        let tail = self.tail.load(Ordering::Relaxed);
-
-        head.checked_sub(tail).unwrap_or(0)
-    }
-
-    pub fn try_enqueue(&self, ctx: &mut EnqueueCtx, val: NonZeroUsize) -> bool {
-        macro_rules! enqueue {
-            ( $ptr:expr, $val:expr ; $ok:expr ; $fail:expr ) => {
-                let mut curr = $ptr.load(Ordering::Acquire);
-
-                for _ in 0..MAX_TRY {
-                    if curr == 0 {
-                        if $ptr.compare_exchange_weak(curr, $val.get(), Ordering::Release, Ordering::Relaxed).is_ok() {
-                            $ok;
-                            return true;
-                        }
-                    } else {
-                        curr = $ptr.load(Ordering::Acquire);
-                    }
+        impl $name {
+            #[inline]
+            pub fn new(cap: usize) -> $name {
+                $name {
+                    queue: $crate::queue::WfQueue::new(cap)
                 }
-
-                $fail;
-                return false;
             }
-        }
 
-        if let Some(index) = ctx.index.load() {
-            let nptr = &self.nptr[index];
+            pub fn push(&self, input: $item) -> Result<(), $item> {
+                let input: std::num::NonZeroUsize = $into(input);
 
-            enqueue!{
-                nptr, val;
+                if paste::expr!{ [<$name _ENQ_CTX>] }
+                    .with(|ctx| self.queue.try_enqueue(ctx, input))
                 {
-                    ctx.index.clean();
-                };
-                {}
-            }
-        }
-
-        let head = self.head.fetch_add(1, Ordering::Relaxed) % self.nptr.len();
-        let nptr = &self.nptr[head];
-
-        enqueue!{
-            nptr, val;
-            {};
-            {
-                ctx.index.store(head);
-            }
-        }
-    }
-
-    pub fn try_dequeue(&self, ctx: &mut DequeueCtx) -> Option<NonZeroUsize> {
-        macro_rules! dequeue {
-            ( $ptr:expr ; $ok:expr ; $fail:expr ) => {
-                let mut val = $ptr.load(Ordering::Acquire);
-
-                for _ in 0..MAX_TRY {
-                    match NonZeroUsize::new(val) {
-                        Some(nzval) => if $ptr.compare_exchange_weak(val, 0, Ordering::Release, Ordering::Relaxed).is_ok() {
-                            $ok;
-                            return Some(nzval);
-                        },
-                        None => {
-                            val = $ptr.load(Ordering::Acquire);
-                        }
-                    }
+                    Ok(())
+                } else {
+                    Err($from(input))
                 }
+            }
 
-                $fail;
-                return None;
+            pub fn pop(&self) -> Option<$item> {
+                let output = paste::expr!{ [<$name _DEQ_CTX>] }
+                    .with(|ctx| self.queue.try_dequeue(ctx))?;
+                Some($from(output))
             }
         }
 
-        if let Some(index) = ctx.index.load() {
-            let nptr = &self.nptr[index];
-
-            dequeue!{
-                nptr;
-                {
-                    ctx.index.clean();
-                };
-                {}
+        impl Drop for $name {
+            fn drop(&mut self) {
+                while self.pop().is_some() {}
             }
         }
-
-        let tail = self.tail.fetch_add(1, Ordering::Relaxed) % self.nptr.len();
-        let nptr = &self.nptr[tail];
-
-        dequeue!{
-            nptr;
-            {};
-            {
-                ctx.index.store(tail);
-            }
-        }
-    }
-}
-
-impl EnqueueCtx {
-    pub const fn new() -> EnqueueCtx {
-        EnqueueCtx { index: Index(0) }
-    }
-}
-
-impl DequeueCtx {
-    pub const fn new() -> DequeueCtx {
-        DequeueCtx { index: Index(0) }
-    }
-}
-
-impl Index {
-    #[inline]
-    pub fn load(&self) -> Option<usize> {
-        self.0.checked_sub(1)
-    }
-
-    #[inline]
-    pub fn clean(&mut self) {
-        self.0 = 0;
-    }
-
-    #[inline]
-    pub fn store(&mut self, val: usize) {
-        self.0 = val + 1;
     }
 }

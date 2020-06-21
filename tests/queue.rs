@@ -15,7 +15,7 @@ mod loom {
 use std::num::NonZeroUsize;
 use loom::sync::Arc;
 use loom::thread;
-use wfqueue::{ WfQueue, EnqueueCtx, DequeueCtx };
+use wfqueue::queue::{ WfQueue, EnqueueCtx, DequeueCtx };
 
 
 #[test]
