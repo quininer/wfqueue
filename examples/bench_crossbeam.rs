@@ -3,10 +3,10 @@ use std::sync::{ atomic, Arc };
 use std::num::NonZeroUsize;
 use crossbeam_queue::ArrayQueue;
 
-const COUNT: isize = 128 * 1024 * 1024;
+const MAX_COUNT: usize = 128 * 1024 * 1024;
 
-static ENQ_COUNT: atomic::AtomicIsize = atomic::AtomicIsize::new(COUNT);
-static DEQ_COUNT: atomic::AtomicIsize = atomic::AtomicIsize::new(COUNT);
+static ENQ_COUNT: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
+static DEQ_COUNT: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 
 
 fn main() {
@@ -22,13 +22,13 @@ fn main() {
         let queue2 = queue.clone();
 
         let h = thread::spawn(move || {
-            while ENQ_COUNT.fetch_sub(1, atomic::Ordering::SeqCst) > 1 {
+            while ENQ_COUNT.fetch_add(1, atomic::Ordering::SeqCst) < MAX_COUNT {
                 while queue.push(val).is_err() {}
             }
         });
 
         let h2 = thread::spawn(move || {
-            while DEQ_COUNT.fetch_sub(1, atomic::Ordering::SeqCst) > 1 {
+            while DEQ_COUNT.fetch_add(1, atomic::Ordering::SeqCst) < MAX_COUNT {
                 while queue2.pop().is_err() {}
             }
         });

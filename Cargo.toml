@@ -14,7 +14,7 @@ documentation = "https://docs.rs/wfqueue"
 [dependencies]
 loom = { version = "0.3", optional = true }
 cache-padded = "1"
-per-thread-object = "0.3"
+per-thread-object = "0.4"
 
 [dev-dependencies]
 crossbeam-queue = "0.2"

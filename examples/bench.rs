@@ -3,10 +3,10 @@ use std::sync::{ atomic, Arc };
 use std::num::NonZeroUsize;
 use wfqueue::queue::{ WfQueue, EnqueueCtx, DequeueCtx };
 
-const COUNT: isize = 128 * 1024 * 1024;
+const MAX_COUNT: usize = 128 * 1024 * 1024;
 
-static ENQ_COUNT: atomic::AtomicIsize = atomic::AtomicIsize::new(COUNT);
-static DEQ_COUNT: atomic::AtomicIsize = atomic::AtomicIsize::new(COUNT);
+static ENQ_COUNT: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
+static DEQ_COUNT: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 
 
 fn main() {
@@ -24,7 +24,7 @@ fn main() {
         let h = thread::spawn(move || {
             let mut enq = EnqueueCtx::new();
 
-            while ENQ_COUNT.fetch_sub(1, atomic::Ordering::SeqCst) > 1 {
+            while ENQ_COUNT.fetch_add(1, atomic::Ordering::SeqCst) < MAX_COUNT {
                 while !queue.try_enqueue(&mut enq, val) {}
             }
         });
@@ -32,7 +32,7 @@ fn main() {
         let h2 = thread::spawn(move || {
             let mut deq = DequeueCtx::new();
 
-            while DEQ_COUNT.fetch_sub(1, atomic::Ordering::SeqCst) > 1 {
+            while DEQ_COUNT.fetch_add(1, atomic::Ordering::SeqCst) < MAX_COUNT {
                 while queue2.try_dequeue(&mut deq).is_none() {}
             }
         });
