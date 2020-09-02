@@ -10,6 +10,7 @@ pub mod queue;
 
 use std::num::NonZeroUsize;
 use std::marker::PhantomData;
+use cache_padded::CachePadded;
 use per_thread_object::ThreadLocal;
 
 
@@ -29,8 +30,8 @@ pub trait Queueable {
 }
 
 struct Context {
-    enq: queue::EnqueueCtx,
-    deq: queue::DequeueCtx
+    enq: CachePadded<queue::EnqueueCtx>,
+    deq: CachePadded<queue::DequeueCtx>
 }
 
 impl<T: Queueable> WfQueue<T> {
@@ -95,8 +96,8 @@ impl<T: Queueable> Drop for WfQueue<T> {
 impl Context {
     pub const fn new() -> Context {
         Context {
-            enq: queue::EnqueueCtx::new(),
-            deq: queue::DequeueCtx::new()
+            enq: CachePadded::new(queue::EnqueueCtx::new()),
+            deq: CachePadded::new(queue::DequeueCtx::new())
         }
     }
 }
